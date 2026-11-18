@@ -12,6 +12,7 @@
 //   <prefix>_field.txt         per-vertex quaternions + edge connectivity (+ tets), see write_field()
 //   <prefix>_singularities.obj singularity graph as line segments
 //   <prefix>_stats.json        timings, sizes, status (also written on failure)
+//   <prefix>_tet.mesh          with --save-tet: Medit tet mesh, written right after tet meshing
 
 #include "hierarchy.h"
 #include "orientations.h"
@@ -85,7 +86,8 @@ void usage(const char *argv0) {
         "                        in Optimizer::setOptimizeOrientations for tet meshes).\n"
         "  --threads <n>         number of TBB worker threads (default: all cores).\n"
         "  --no-hierarchy        smooth only on the finest level (Optimizer::setHierarchy(false)).\n"
-        "  --save-tet            also write <prefix>_tet.mesh (Medit) for visualisation.\n",
+        "  --save-tet            write the TetGen tet mesh to <prefix>_tet.mesh (Medit: vertices,\n"
+        "                        boundary triangles, tets) right after tet meshing succeeds.\n",
         argv0);
 }
 
@@ -246,14 +248,21 @@ bool write_singularities(const std::string &path, const MultiResolutionHierarchy
     return ok;
 }
 
+// Medit .mesh of the TetGen output as stored by tet_meshing(): vertices (same indices and
+// float coordinates as in _field.txt), boundary triangles (oriented, mF) and tetrahedra
+// (TetGen's vertex order, identical to what TetGen's own -g output writes). 1-based.
 bool write_tet_medit(const std::string &path, const MultiResolutionHierarchy &mRes) {
     const MatrixXf &V = mRes.mV[0];
+    const MatrixXu &F = mRes.mF;
     const MatrixXu &T = mRes.mT;
     FILE *f = fopen(path.c_str(), "w");
     if (!f) return false;
     fprintf(f, "MeshVersionFormatted 1\nDimension 3\nVertices\n%lld\n", (long long) V.cols());
     for (int i = 0; i < V.cols(); ++i)
         fprintf(f, "%.9g %.9g %.9g 0\n", V(0, i), V(1, i), V(2, i));
+    fprintf(f, "Triangles\n%lld\n", (long long) F.cols());
+    for (int i = 0; i < F.cols(); ++i)
+        fprintf(f, "%u %u %u 1\n", F(0, i) + 1, F(1, i) + 1, F(2, i) + 1);
     fprintf(f, "Tetrahedra\n%lld\n", (long long) T.cols());
     for (int t = 0; t < T.cols(); ++t)
         fprintf(f, "%u %u %u %u 0\n", T(0, t) + 1, T(1, t) + 1, T(2, t) + 1, T(3, t) + 1);
@@ -366,6 +375,16 @@ int main(int argc, char **argv) {
     js.integer("tets", mRes.mT.cols());
     js.integer("boundary_triangles", mRes.mF.cols());
 
+    // Written as soon as the tet mesh exists (so it survives a later RoSy failure); not timed.
+    if (saveTet) {
+        const std::string tetPath = prefix + "_tet.mesh";
+        auto tw = Clock::now();
+        if (!write_tet_medit(tetPath, mRes))
+            return fail(WRITE_FAILED, "write", "could not write " + tetPath);
+        js.str("tet_mesh_file", tetPath);
+        js.num("time_tet_export_s", seconds_since(tw));
+    }
+
     // ---- hierarchy + RoSy
     double tBuild = 0, tRosy = 0;
     try {
@@ -404,8 +423,6 @@ int main(int argc, char **argv) {
         return fail(WRITE_FAILED, "write", "could not write " + prefix + "_field.txt");
     if (!write_singularities(prefix + "_singularities.obj", mRes, ss))
         return fail(WRITE_FAILED, "write", "could not write " + prefix + "_singularities.obj");
-    if (saveTet && !write_tet_medit(prefix + "_tet.mesh", mRes))
-        return fail(WRITE_FAILED, "write", "could not write " + prefix + "_tet.mesh");
     js.num("time_export_s", seconds_since(t0));
 
     js.integer("singular_faces", ss.faces);

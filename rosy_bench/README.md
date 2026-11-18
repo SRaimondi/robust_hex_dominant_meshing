@@ -34,6 +34,12 @@ python3 rosy_bench/run_batch.py <input_dir> <output_dir> [--timeout 3600] [--ski
 Writes `<output_dir>/<name>/{<name>_field.txt, <name>_singularities.obj, <name>_stats.json, log.txt}`
 and `<output_dir>/summary.csv` (one row per mesh: status, failed stage, error, sizes, timings).
 
+`--save-tet` (both tools) also writes `<name>_tet.mesh`, a Medit file with the TetGen vertices,
+the oriented boundary triangles and the tets. It is written as soon as tet meshing succeeds, so
+it exists even if the RoSy stage fails later, and the write is not counted in any timing. The
+vertex indices and float coordinates are the ones in `_field.txt`, and the tet vertex order is
+the same as TetGen's own `-g` output.
+
 ## Defaults (match the original code)
 
 * Target tet edge length = 1.05 × average input edge length: this is what `load()` sets and
