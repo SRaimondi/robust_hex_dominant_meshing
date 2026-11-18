@@ -2,7 +2,9 @@
 #include "meshio.h"
 #include "timer.h"
 #include "quat.h"
+#ifndef RHDM_HEADLESS
 #include "bvh.h"
+#endif
 #include "orient_triangle_mesh.h"
 #include "dedge.h"
 #include "subdivide.h"
@@ -295,8 +297,10 @@ void MultiResolutionHierarchy::build() {
 	Timer<> timer;
 	mV.resize(1);
 
+#ifndef RHDM_HEADLESS
 	if (mBVH)
 		delete mBVH;
+#endif
 
 	timer.beginStage("Computing face and vertex normals");
 	mN.resize(1);
@@ -610,8 +614,11 @@ void MultiResolutionHierarchy::build() {
 	mOrientationIterations = 0;
 	mPositionIterations = 0;
 
+#ifndef RHDM_HEADLESS
+	// BVH over the boundary triangles: only used by the GUI, not by the RoSy solver.
 	mBVH = new BVH(&mF, &mV[0], mAABB);
 	mBVH->build();
+#endif
 	mScale = diagonalLen * ratio_scale;
 	mInvScale = 1.f / mScale;
 

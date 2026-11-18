@@ -6,15 +6,19 @@
 #include "adjacency.h"
 #include "meshio.h"
 #include "tetgen.h"
+#ifndef RHDM_HEADLESS
 #include <nanogui/serializer/core.h>
 #include <nanogui/serializer/sparse.h>
+#endif
 #include <unordered_map>
 #include <algorithm> 
 #include <queue>
 #include "global_types.h"
 #include <set>
 
+#ifndef RHDM_HEADLESS
 using nanogui::Serializer;
+#endif
 using namespace std;
 class BVH;
 
